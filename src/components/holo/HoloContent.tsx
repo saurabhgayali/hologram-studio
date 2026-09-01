@@ -7,7 +7,15 @@ import { TINTS } from "./types";
 
 /* ---------------------------------- dust --------------------------------- */
 
-function OrbitingDust({ count = 400, color }: { count?: number; color: string }) {
+function OrbitingDust({
+  count = 400,
+  color,
+  autoRotate = false,
+}: {
+  count?: number;
+  color: string;
+  autoRotate?: boolean;
+}) {
   const ref = useRef<THREE.Points>(null);
   const geo = useMemo(() => {
     const positions = new Float32Array(count * 3);
@@ -25,7 +33,7 @@ function OrbitingDust({ count = 400, color }: { count?: number; color: string })
   useEffect(() => () => geo.dispose(), [geo]);
   useFrame((_, d) => {
     if (ref.current) {
-      ref.current.rotation.y += d * 0.25;
+      if (autoRotate) ref.current.rotation.y += d * 0.25;
       ref.current.rotation.x = Math.sin(performance.now() * 0.0002) * 0.15;
     }
   });
