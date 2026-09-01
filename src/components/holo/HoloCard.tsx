@@ -70,7 +70,9 @@ const HOLO_FRAG = /* glsl */ `
 
     // linear -> sRGB (custom ShaderMaterial gets no automatic output encoding)
     col = pow(max(col, vec3(0.0)), vec3(1.0 / 2.2));
-    col *= 1.35;
+    // keep spectral hue in the highlights instead of blowing out to white
+    col = mix(col, uTint * (0.45 + lum * 0.9), 0.5);
+    col *= 1.05;
     float alpha = clamp((lum * 1.35 + 0.12 + fres * 0.4), 0.0, 1.0) * uOpacity;
     gl_FragColor = vec4(col, alpha);
   }
