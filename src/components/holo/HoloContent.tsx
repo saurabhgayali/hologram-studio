@@ -350,11 +350,11 @@ export function HoloContent({ settings }: { settings: HoloSettings }) {
       {settings.fire && <FireFx />}
 
       <Suspense fallback={null}>
-        {settings.preset === "crystal" && <CrystalPreset color={color} />}
-        {settings.preset === "fire" && <FirePreset />}
-        {settings.preset === "galaxy" && <GalaxyPreset color={color} />}
+        {settings.preset === "crystal" && <CrystalPreset color={color} autoRotate={settings.autoRotate} />}
+        {settings.preset === "fire" && <FirePreset autoRotate={settings.autoRotate} />}
+        {settings.preset === "galaxy" && <GalaxyPreset color={color} autoRotate={settings.autoRotate} />}
         {settings.preset === "custom" && settings.customUrl && (
-          <CustomModel url={settings.customUrl} />
+          <CustomModel url={settings.customUrl} autoRotate={settings.autoRotate} />
         )}
       </Suspense>
     </>
