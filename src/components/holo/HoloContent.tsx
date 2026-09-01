@@ -2,6 +2,7 @@ import { useFrame, useLoader } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { ModelBoundary } from "./ModelBoundary";
 import type { HoloSettings } from "./types";
 import { TINTS } from "./types";
 
@@ -354,7 +355,9 @@ export function HoloContent({ settings }: { settings: HoloSettings }) {
         {settings.preset === "fire" && <FirePreset autoRotate={settings.autoRotate} />}
         {settings.preset === "galaxy" && <GalaxyPreset color={color} autoRotate={settings.autoRotate} />}
         {settings.preset === "custom" && settings.customUrl && (
-          <CustomModel url={settings.customUrl} autoRotate={settings.autoRotate} />
+          <ModelBoundary key={settings.customUrl}>
+            <CustomModel url={settings.customUrl} autoRotate={settings.autoRotate} />
+          </ModelBoundary>
         )}
       </Suspense>
     </>

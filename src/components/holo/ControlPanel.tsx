@@ -109,7 +109,7 @@ export function ControlPanel({
   const urlRef = useRef<string | null>(null);
 
   const loadFile = useCallback(
-    (file: File) => {
+    async (file: File) => {
       setError(null);
       if (!/\.(glb|gltf)$/i.test(file.name)) {
         setError("Unsupported file. Please provide a .glb or .gltf model.");
@@ -120,13 +120,48 @@ export function ControlPanel({
         return;
       }
       setLoading(true);
-      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-      const url = URL.createObjectURL(file);
-      urlRef.current = url;
-      setFileName(file.name);
-      set("customUrl", url);
-      set("preset", "custom");
-      window.setTimeout(() => setLoading(false), 900);
+      try {
+        const buffer = await file.arrayBuffer();
+        const isGlb = /\.glb$/i.test(file.name);
+        if (isGlb) {
+          if (buffer.byteLength < 20) throw new Error("File is empty or truncated.");
+          const header = new DataView(buffer);
+          // "glTF" magic + version + total length must match the actual bytes
+          const magic = String.fromCharCode(
+            header.getUint8(0),
+            header.getUint8(1),
+            header.getUint8(2),
+            header.getUint8(3),
+          );
+          if (magic !== "glTF") throw new Error("Not a valid binary glTF (.glb) file.");
+          const declared = header.getUint32(8, true);
+          if (declared !== buffer.byteLength) {
+            throw new Error("The .glb file appears corrupted or incomplete.");
+          }
+        } else {
+          const text = new TextDecoder().decode(buffer);
+          const json = JSON.parse(text) as { asset?: { version?: string } };
+          if (!json.asset?.version) throw new Error("Not a valid .gltf document.");
+        }
+
+        if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+        const url = URL.createObjectURL(
+          new Blob([buffer], {
+            type: isGlb ? "model/gltf-binary" : "model/gltf+json",
+          }),
+        );
+        urlRef.current = url;
+        setFileName(file.name);
+        set("customUrl", url);
+        set("preset", "custom");
+      } catch (err) {
+        setFileName(null);
+        setError(
+          err instanceof Error ? err.message : "Could not read that model file.",
+        );
+      } finally {
+        setLoading(false);
+      }
     },
     [set],
   );
