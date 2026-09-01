@@ -7,7 +7,15 @@ import { TINTS } from "./types";
 
 /* ---------------------------------- dust --------------------------------- */
 
-function OrbitingDust({ count = 400, color }: { count?: number; color: string }) {
+function OrbitingDust({
+  count = 400,
+  color,
+  autoRotate = false,
+}: {
+  count?: number;
+  color: string;
+  autoRotate?: boolean;
+}) {
   const ref = useRef<THREE.Points>(null);
   const geo = useMemo(() => {
     const positions = new Float32Array(count * 3);
@@ -25,7 +33,7 @@ function OrbitingDust({ count = 400, color }: { count?: number; color: string })
   useEffect(() => () => geo.dispose(), [geo]);
   useFrame((_, d) => {
     if (ref.current) {
-      ref.current.rotation.y += d * 0.25;
+      if (autoRotate) ref.current.rotation.y += d * 0.25;
       ref.current.rotation.x = Math.sin(performance.now() * 0.0002) * 0.15;
     }
   });
@@ -46,10 +54,10 @@ function OrbitingDust({ count = 400, color }: { count?: number; color: string })
 
 /* -------------------------------- presets -------------------------------- */
 
-function CrystalPreset({ color }: { color: string }) {
+function CrystalPreset({ color, autoRotate = false }: { color: string; autoRotate?: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
   useFrame((_, d) => {
-    if (ref.current) {
+    if (ref.current && autoRotate) {
       ref.current.rotation.y += d * 0.5;
       ref.current.rotation.z += d * 0.12;
     }
@@ -71,7 +79,7 @@ function CrystalPreset({ color }: { color: string }) {
         <icosahedronGeometry args={[1.1, 0]} />
         <meshBasicMaterial color={color} wireframe transparent opacity={0.55} />
       </mesh>
-      <OrbitingDust color={color} />
+      <OrbitingDust color={color} autoRotate={autoRotate} />
     </group>
   );
 }
@@ -111,7 +119,7 @@ const FIRE_FRAG = /* glsl */ `
   }
 `;
 
-function FirePreset() {
+function FirePreset({ autoRotate = false }: { autoRotate?: boolean }) {
   const mat = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
   useFrame((s) => {
@@ -139,13 +147,19 @@ function FirePreset() {
           depthWrite={false}
         />
       </mesh>
-      <OrbitingDust count={250} color="#ffb066" />
+      <OrbitingDust count={250} color="#ffb066" autoRotate={autoRotate} />
       <pointLight position={[0, 0, 0]} intensity={6} distance={8} color="#ff7a18" />
     </group>
   );
 }
 
-function GalaxyPreset({ color }: { color: string }) {
+function GalaxyPreset({
+  color,
+  autoRotate = false,
+}: {
+  color: string;
+  autoRotate?: boolean;
+}) {
   const ref = useRef<THREE.Points>(null);
   const { geo, mat } = useMemo(() => {
     const count = 9000;
@@ -192,7 +206,7 @@ function GalaxyPreset({ color }: { color: string }) {
   );
 
   useFrame((_, d) => {
-    if (ref.current) ref.current.rotation.y += d * 0.12;
+    if (ref.current && autoRotate) ref.current.rotation.y += d * 0.12;
   });
 
   return (
@@ -209,7 +223,7 @@ function GalaxyPreset({ color }: { color: string }) {
 
 /* ------------------------------ custom model ------------------------------ */
 
-function CustomModel({ url }: { url: string }) {
+function CustomModel({ url, autoRotate = false }: { url: string; autoRotate?: boolean }) {
   const gltf = useLoader(GLTFLoader, url);
   const ref = useRef<THREE.Group>(null);
 
@@ -242,7 +256,7 @@ function CustomModel({ url }: { url: string }) {
   );
 
   useFrame((_, d) => {
-    if (ref.current) ref.current.rotation.y += d * 0.4;
+    if (ref.current && autoRotate) ref.current.rotation.y += d * 0.4;
   });
 
   return (
@@ -336,11 +350,11 @@ export function HoloContent({ settings }: { settings: HoloSettings }) {
       {settings.fire && <FireFx />}
 
       <Suspense fallback={null}>
-        {settings.preset === "crystal" && <CrystalPreset color={color} />}
-        {settings.preset === "fire" && <FirePreset />}
-        {settings.preset === "galaxy" && <GalaxyPreset color={color} />}
+        {settings.preset === "crystal" && <CrystalPreset color={color} autoRotate={settings.autoRotate} />}
+        {settings.preset === "fire" && <FirePreset autoRotate={settings.autoRotate} />}
+        {settings.preset === "galaxy" && <GalaxyPreset color={color} autoRotate={settings.autoRotate} />}
         {settings.preset === "custom" && settings.customUrl && (
-          <CustomModel url={settings.customUrl} />
+          <CustomModel url={settings.customUrl} autoRotate={settings.autoRotate} />
         )}
       </Suspense>
     </>

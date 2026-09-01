@@ -34,5 +34,5 @@ export const DEFAULT_SETTINGS: HoloSettings = {
   fire: false,
   fog: true,
   starfield: true,
-  autoRotate: true,
+  autoRotate: false,
 };
