@@ -54,10 +54,10 @@ function OrbitingDust({
 
 /* -------------------------------- presets -------------------------------- */
 
-function CrystalPreset({ color }: { color: string }) {
+function CrystalPreset({ color, autoRotate = false }: { color: string; autoRotate?: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
   useFrame((_, d) => {
-    if (ref.current) {
+    if (ref.current && autoRotate) {
       ref.current.rotation.y += d * 0.5;
       ref.current.rotation.z += d * 0.12;
     }
@@ -79,7 +79,7 @@ function CrystalPreset({ color }: { color: string }) {
         <icosahedronGeometry args={[1.1, 0]} />
         <meshBasicMaterial color={color} wireframe transparent opacity={0.55} />
       </mesh>
-      <OrbitingDust color={color} />
+      <OrbitingDust color={color} autoRotate={autoRotate} />
     </group>
   );
 }
@@ -119,7 +119,7 @@ const FIRE_FRAG = /* glsl */ `
   }
 `;
 
-function FirePreset() {
+function FirePreset({ autoRotate = false }: { autoRotate?: boolean }) {
   const mat = useRef<THREE.ShaderMaterial>(null);
   const uniforms = useMemo(() => ({ uTime: { value: 0 } }), []);
   useFrame((s) => {
@@ -147,13 +147,19 @@ function FirePreset() {
           depthWrite={false}
         />
       </mesh>
-      <OrbitingDust count={250} color="#ffb066" />
+      <OrbitingDust count={250} color="#ffb066" autoRotate={autoRotate} />
       <pointLight position={[0, 0, 0]} intensity={6} distance={8} color="#ff7a18" />
     </group>
   );
 }
 
-function GalaxyPreset({ color }: { color: string }) {
+function GalaxyPreset({
+  color,
+  autoRotate = false,
+}: {
+  color: string;
+  autoRotate?: boolean;
+}) {
   const ref = useRef<THREE.Points>(null);
   const { geo, mat } = useMemo(() => {
     const count = 9000;
@@ -200,7 +206,7 @@ function GalaxyPreset({ color }: { color: string }) {
   );
 
   useFrame((_, d) => {
-    if (ref.current) ref.current.rotation.y += d * 0.12;
+    if (ref.current && autoRotate) ref.current.rotation.y += d * 0.12;
   });
 
   return (
@@ -217,7 +223,7 @@ function GalaxyPreset({ color }: { color: string }) {
 
 /* ------------------------------ custom model ------------------------------ */
 
-function CustomModel({ url }: { url: string }) {
+function CustomModel({ url, autoRotate = false }: { url: string; autoRotate?: boolean }) {
   const gltf = useLoader(GLTFLoader, url);
   const ref = useRef<THREE.Group>(null);
 
@@ -250,7 +256,7 @@ function CustomModel({ url }: { url: string }) {
   );
 
   useFrame((_, d) => {
-    if (ref.current) ref.current.rotation.y += d * 0.4;
+    if (ref.current && autoRotate) ref.current.rotation.y += d * 0.4;
   });
 
   return (
