@@ -38,7 +38,9 @@
     box-shadow: 0 20px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
   }
 
-  #brand { top: 20px; left: 20px; padding: 12px 18px; }
+  #brand { top: 20px; left: 20px; padding: 12px 18px; display: flex; align-items: center; gap: 16px; }
+  #gh-link { color: var(--muted); display: inline-flex; transition: color .2s, filter .2s; }
+  #gh-link:hover { color: var(--accent); filter: drop-shadow(0 0 6px var(--accent)); }
   #brand h1 { margin: 0; font-family: Orbitron, sans-serif; font-size: 15px; letter-spacing: .28em;
     color: var(--accent); text-shadow: 0 0 18px rgba(56,232,255,.45); }
   #brand p { margin: 4px 0 0; font-size: 12px; letter-spacing: .22em; color: var(--muted); text-transform: uppercase; }
@@ -193,7 +195,7 @@
   </button>
 </nav>
 
-<div id="help">Drag to orbit · Scroll to zoom · <a href="./doc.html">Docs</a></div>
+<div id="help">Drag to orbit · Scroll to zoom · <a href="./doc.html">Docs</a> · <a href="https://github.com/saurabhgayali/hologram-studio" target="_blank" rel="noopener">GitHub</a></div>
 
 <script type="importmap">
 {
