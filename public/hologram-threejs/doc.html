@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Holo-Deck Docs — How the three.js Hologram Works</title>
+<meta name="description" content="How the render-target hologram works, and how to drop holo-projector.js onto any three.js surface with your own GLB model." />
+<meta property="og:title" content="Holo-Deck Docs — How the three.js Hologram Works" />
+<meta property="og:description" content="Architecture, shader breakdown and full API reference for the reusable holo-projector.js module." />
+<meta property="og:type" content="article" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg:#05070d; --card:rgba(12,20,30,.65); --line:rgba(120,220,255,.16);
+          --accent:#38e8ff; --text:#d8ecf6; --muted:#7e94a6; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:
+      radial-gradient(1100px 620px at 82% -8%, rgba(56,232,255,.12), transparent 62%),
+      radial-gradient(900px 520px at 6% 108%, rgba(255,69,208,.09), transparent 60%), var(--bg);
+    color: var(--text); font-family: Rajdhani, ui-sans-serif, system-ui, sans-serif;
+    font-size: 17px; line-height: 1.65; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 56px 22px 120px; }
+  a { color: var(--accent); }
+  header.top { border-bottom: 1px solid var(--line); padding-bottom: 26px; margin-bottom: 38px; }
+  h1 { font-family: Orbitron, sans-serif; font-size: clamp(26px, 5vw, 40px); letter-spacing:.12em;
+       margin: 0 0 8px; color: var(--accent); text-shadow: 0 0 30px rgba(56,232,255,.35); }
+  h2 { font-family: Orbitron, sans-serif; font-size: 19px; letter-spacing:.14em; margin: 52px 0 12px;
+       text-transform: uppercase; }
+  h3 { font-size: 18px; letter-spacing:.06em; margin: 28px 0 6px; color: var(--accent); }
+  p, li { color: #c3d7e3; }
+  .lede { color: var(--muted); font-size: 18px; margin: 0; }
+  code { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: .86em;
+         background: rgba(120,220,255,.09); padding: 2px 6px; border-radius: 5px; color: #a9e9ff; }
+  pre { background: rgba(4,9,16,.85); border: 1px solid var(--line); border-radius: 14px;
+        padding: 18px 20px; overflow-x: auto; }
+  pre code { background: none; padding: 0; color: #b9d9ea; font-size: 13.5px; line-height: 1.65; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 24px;
+          backdrop-filter: blur(14px); margin: 18px 0; }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 15.5px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid rgba(120,220,255,.12); vertical-align: top; }
+  th { font-family: Orbitron, sans-serif; font-size: 11px; letter-spacing:.16em; text-transform: uppercase; color: var(--muted); }
+  td code { white-space: nowrap; }
+  .pill { display:inline-block; padding: 5px 12px; border:1px solid var(--line); border-radius:99px;
+          font-size: 12px; letter-spacing:.16em; text-transform: uppercase; color: var(--muted); }
+  .cta { display:inline-block; margin-top: 14px; padding: 11px 20px; border-radius: 11px;
+         background: rgba(56,232,255,.12); border: 1px solid rgba(56,232,255,.4);
+         text-decoration: none; letter-spacing:.14em; text-transform: uppercase; font-size: 13px; }
+  ol li, ul li { margin-bottom: 6px; }
+  .ascii { color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <span class="pill">Documentation</span>
+  <h1>Holo-Deck</h1>
+  <p class="lede">A render-target volumetric hologram for three.js — how it works, and how to project your own GLB onto any surface in your own scene.</p>
+  <a class="cta" href="./index.html">← Open the live demo</a>
+</header>
+
+<h2>1. The core idea</h2>
+<p>A hologram panel is really <strong>two scenes and two cameras</strong>. The content you want to appear "inside" the panel never lives in your visible scene — it lives in a hidden scene that is rendered into a texture, and that texture is painted onto a flat surface with a shader that makes it look like light rather than paint.</p>
+
+<pre class="ascii"><code>  hidden scene            render target            visible scene
+  ┌──────────────┐        ┌────────────┐          ┌────────────────────┐
+  │  your GLB    │  ───►  │  1024×1024 │  ───►    │  card frame        │
+  │  lights, fx  │ render │  texture   │  uMap    │  ├ panel mesh ─────┼── hologram shader
+  │  hidden cam  │        └────────────┘          │  └ glass cover     │
+  └──────▲───────┘                                └─────────▲──────────┘
+         └──────── angle mirrored every frame ──────────────┘
+                     (this is what creates real depth)</code></pre>
+
+<h3>Why it looks volumetric</h3>
+<p>A static texture on a plane is a sticker — turn your head and it stays flat. Every frame the projector takes your <em>main</em> camera position, converts it into the panel's local space, and places the hidden camera on a sphere of the same direction around the hidden content. Orbit the card 30° to the left and the hidden camera also swings 30° to the left, so you literally see the far side of the model through the window. That parallax is the whole trick.</p>
+
+<h2>2. Pipeline, step by step</h2>
+<div class="card">
+<ol>
+  <li><strong>Hidden scene</strong> — <code>new THREE.Scene()</code> holding your model, lights, dust/starfield particles and optional fog. It is never added to your visible scene.</li>
+  <li><strong>Hidden camera</strong> — a <code>PerspectiveCamera</code> orbiting at a fixed radius (<code>distance</code>), always looking at the origin.</li>
+  <li><strong>Render target</strong> — a <code>WebGLRenderTarget</code> (1024², <code>HalfFloatType</code>, 4× MSAA). Once per frame: <code>setRenderTarget(rt) → clear() → render(hidden, hiddenCam) → setRenderTarget(previous)</code>. Restoring the previous target matters, otherwise you break post-processing chains.</li>
+  <li><strong>Hologram material</strong> — a <code>ShaderMaterial</code> sampling that texture, <code>transparent</code>, <code>depthWrite:false</code>, <code>AdditiveBlending</code>, <code>toneMapped:false</code>.</li>
+  <li><strong>Surface</strong> — any mesh with UVs. In the demo it is a plane recessed inside a metallic card body, with a faint glass sheet in front and a point light in front of the window so the hologram appears to spill light into the room.</li>
+</ol>
+</div>
+
+<h3>Gotcha: colour space</h3>
+<p>Built-in materials get an automatic linear→sRGB conversion at the end of the shader. A raw <code>ShaderMaterial</code> does <strong>not</strong>. That is why the fragment shader ends with an explicit <code>pow(col, vec3(1.0/2.2))</code> — without it, the projection looks nearly black.</p>
+
+<h2>3. What the shader does</h2>
+<table>
+  <tr><th>Effect</th><th>Technique</th></tr>
+  <tr><td>Glitch bands</td><td>Rows are quantised into 90 bands; a hashed random per band and time-step shifts <code>uv.x</code>, scaled by <code>uGlitch</code>.</td></tr>
+  <tr><td>Chromatic split</td><td>R and B are sampled at ±<code>ca</code> horizontal offsets from G — cheap prism fringing.</td></tr>
+  <tr><td>Spectral tint</td><td>Luminance-weighted mix toward <code>uTint</code>, so bright areas stay hue-correct instead of clipping to white.</td></tr>
+  <tr><td>Scanlines</td><td><code>sin(uv.y * 620 - time * 9 * uScanSpeed)</code> multiplied over the colour, plus a slow rolling sweep band.</td></tr>
+  <tr><td>Fresnel edge glow</td><td><code>pow(1 - dot(normal, viewDir), 2.5)</code>, added to the colour and to alpha so grazing angles bloom.</td></tr>
+  <tr><td>Flicker</td><td>Per-frame hashed brightness dip, scaled by <code>uGlitch</code>.</td></tr>
+  <tr><td>Alpha</td><td>Derived from luminance + fresnel × <code>uOpacity</code>, so dark parts of the hidden scene become genuinely transparent instead of grey.</td></tr>
+</table>
+
+<h2>4. Quick start for your own project</h2>
+<p>Copy <code>holo-projector.js</code> (and optionally <code>presets.js</code>) into your project. It needs three.js and <code>GLTFLoader</code> — nothing else, no build step required.</p>
+
+<pre><code>import * as THREE from 'three';
+import { HoloProjector } from './holo-projector.js';
+
+const holo = new HoloProjector({ renderer });
+
+// 1. what to project — any Object3D, or a GLB URL
+await holo.loadGLB('/models/robot.glb');   // auto-centered + auto-scaled
+// holo.setContent(myObject3D);
+
+// 2. where to project it — ANY mesh in your scene
+const panel = new THREE.Mesh(new THREE.PlaneGeometry(2, 3), holo.material);
+scene.add(panel);
+holo.attachTo(panel);          // parallax anchor
+
+// 3. once per frame, BEFORE your main render
+function loop() {
+  const delta = clock.getDelta();
+  holo.update(camera, delta);
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}</code></pre>
+
+<div class="grid">
+  <div class="card">
+    <h3>Any surface</h3>
+    <p><code>holo.material</code> is an ordinary material. Put it on a curved panel, a cylinder, a phone screen model, a portal ring — anything with UVs.</p>
+  </div>
+  <div class="card">
+    <h3>Any model</h3>
+    <p><code>loadGLB()</code> fits the model into the hidden frustum automatically. Use <code>{ fit: false }</code> to keep authored scale.</p>
+  </div>
+  <div class="card">
+    <h3>Many projectors</h3>
+    <p>Create one <code>HoloProjector</code> per display. Each owns its own hidden scene, render target and material.</p>
+  </div>
+</div>
+
+<h2>5. API reference</h2>
+
+<h3>new HoloProjector(options)</h3>
+<table>
+  <tr><th>Option</th><th>Default</th><th>Meaning</th></tr>
+  <tr><td><code>renderer</code></td><td>—</td><td><strong>Required.</strong> Your <code>WebGLRenderer</code>.</td></tr>
+  <tr><td><code>size</code></td><td><code>1024</code></td><td>Render-target resolution (square). Drop to 512 on mobile.</td></tr>
+  <tr><td><code>tint</code></td><td><code>'#38e8ff'</code></td><td>Spectral hologram colour.</td></tr>
+  <tr><td><code>opacity</code></td><td><code>0.9</code></td><td>Overall projection strength.</td></tr>
+  <tr><td><code>scanSpeed</code></td><td><code>1</code></td><td>Scanline / sweep speed multiplier.</td></tr>
+  <tr><td><code>glitch</code></td><td><code>0.15</code></td><td>0 = clean, 1 = heavily corrupted signal.</td></tr>
+  <tr><td><code>distance</code></td><td><code>4.6</code></td><td>Hidden camera orbit radius — smaller = model fills more of the panel.</td></tr>
+  <tr><td><code>fov</code></td><td><code>45</code></td><td>Hidden camera field of view.</td></tr>
+  <tr><td><code>fitSize</code></td><td><code>2.4</code></td><td>Target bounding-box size for auto-fitted models.</td></tr>
+  <tr><td><code>parallax</code></td><td><code>true</code></td><td>Mirror the main camera angle. Off = fixed head-on view.</td></tr>
+  <tr><td><code>additive</code></td><td><code>true</code></td><td>Additive blending. Set false for normal alpha blending on bright backgrounds.</td></tr>
+  <tr><td><code>autoRotate</code></td><td><code>false</code></td><td>Spin the content group.</td></tr>
+  <tr><td><code>autoRotateSpeed</code></td><td><code>0.4</code></td><td>Radians per second.</td></tr>
+  <tr><td><code>samples</code></td><td><code>4</code></td><td>MSAA samples on the render target.</td></tr>
+</table>
+
+<h3>Properties</h3>
+<table>
+  <tr><th>Property</th><th>Description</th></tr>
+  <tr><td><code>.material</code></td><td>The hologram <code>ShaderMaterial</code>. Assign it to any mesh.</td></tr>
+  <tr><td><code>.scene</code></td><td>The hidden scene — add your own lights, particles or <code>.fog</code> here.</td></tr>
+  <tr><td><code>.camera</code></td><td>The hidden camera.</td></tr>
+  <tr><td><code>.contentGroup</code></td><td>Group holding projected content; auto-rotate spins this.</td></tr>
+  <tr><td><code>.renderTarget</code></td><td>The <code>WebGLRenderTarget</code>, if you want the raw texture.</td></tr>
+</table>
+
+<h3>Methods</h3>
+<table>
+  <tr><th>Method</th><th>Description</th></tr>
+  <tr><td><code>update(camera, delta)</code></td><td>Call every frame before your main render. Advances time, applies parallax, renders the target.</td></tr>
+  <tr><td><code>setContent(obj, {fit, owned})</code></td><td>Replace the projected object. <code>fit</code> auto-centers + scales; <code>owned</code> means the projector disposes it.</td></tr>
+  <tr><td><code>loadGLB(url, {fit})</code></td><td>Promise-based GLB/glTF loader (accepts blob URLs from file inputs).</td></tr>
+  <tr><td><code>clearContent()</code></td><td>Remove and dispose the current content.</td></tr>
+  <tr><td><code>fit(obj, targetSize)</code></td><td>Auto-center and auto-scale any object manually.</td></tr>
+  <tr><td><code>attachTo(obj)</code></td><td>Set the parallax anchor (usually the panel mesh).</td></tr>
+  <tr><td><code>setTint / setOpacity / setScanSpeed / setGlitch / setAutoRotate</code></td><td>Live FX setters.</td></tr>
+  <tr><td><code>addDefaultLights(i)</code> / <code>removeDefaultLights()</code> / <code>setLightIntensity(i)</code></td><td>Manage the built-in three-light rig in the hidden scene.</td></tr>
+  <tr><td><code>setResolution(size)</code></td><td>Resize the render target at runtime.</td></tr>
+  <tr><td><code>dispose()</code></td><td>Free the render target, material and everything in the hidden scene.</td></tr>
+</table>
+
+<h3>Helpers</h3>
+<table>
+  <tr><th>Export</th><th>Description</th></tr>
+  <tr><td><code>createValidatedModelURL(file)</code></td><td>Validates a user-picked <code>File</code> (extension, size cap, GLB magic header <code>glTF</code>, declared-length match, glTF JSON <code>asset.version</code>) then returns a typed blob URL. This is what prevents the classic <em>"Invalid typed array length"</em> crash from a truncated upload.</td></tr>
+  <tr><td><code>disposeObject(root)</code></td><td>Recursively disposes geometries, materials and their textures.</td></tr>
+  <tr><td><code>HOLO_VERTEX_SHADER</code> / <code>HOLO_FRAGMENT_SHADER</code></td><td>The raw GLSL, if you want to fork the look.</td></tr>
+</table>
+
+<h2>6. Recipes</h2>
+
+<h3>Custom hidden scene instead of the built-in lights</h3>
+<pre><code>holo.removeDefaultLights();
+holo.scene.fog = new THREE.FogExp2('#04121c', 0.03);
+holo.scene.add(new THREE.HemisphereLight(0x88ddff, 0x220044, 2));</code></pre>
+
+<h3>Upload from a file input, safely</h3>
+<pre><code>import { createValidatedModelURL } from './holo-projector.js';
+
+input.onchange = async () => {
+  const res = await createValidatedModelURL(input.files[0]);
+  if (!res.ok) return showError(res.error);
+  try { await holo.loadGLB(res.url); } catch (e) { showError(e.message); res.revoke(); }
+};</code></pre>
+
+<h3>Animate presets or your own content</h3>
+<pre><code>import { createGalaxy } from './presets.js';
+const galaxy = createGalaxy({ color: '#4dff88' });
+holo.setContent(galaxy.object, { fit: false });
+// in your loop:
+galaxy.update(delta, elapsed, { autoRotate: true });</code></pre>
+
+<h2>7. Performance &amp; cleanup</h2>
+<ul>
+  <li>The hidden scene is a full extra render pass each frame — keep it lean, and use <code>setResolution(512)</code> on low-end devices.</li>
+  <li>Skip <code>holo.update()</code> when the panel is off-screen or occluded; the last frame stays in the texture.</li>
+  <li>Every swap goes through <code>clearContent()</code>, which disposes geometries, materials and textures of content the projector owns.</li>
+  <li>Always revoke blob URLs (<code>res.revoke()</code>) after replacing an uploaded model.</li>
+  <li>Call <code>holo.dispose()</code> when the view unmounts — render targets are not garbage collected.</li>
+</ul>
+
+<h2>8. Troubleshooting</h2>
+<table>
+  <tr><th>Symptom</th><th>Cause</th></tr>
+  <tr><td>Panel is black</td><td>Missing manual sRGB conversion in a forked shader, or no lights in the hidden scene.</td></tr>
+  <tr><td>No depth when orbiting</td><td><code>attachTo()</code> was never called, or <code>parallax: false</code>.</td></tr>
+  <tr><td>Hologram washes out to white</td><td>Additive blending over a bright background — set <code>additive: false</code> or lower <code>opacity</code>.</td></tr>
+  <tr><td><em>Invalid typed array length</em></td><td>Truncated/corrupt GLB. Route uploads through <code>createValidatedModelURL()</code>.</td></tr>
+  <tr><td>Panel hidden behind other transparency</td><td>Additive + <code>depthWrite:false</code> is order-sensitive; set <code>renderOrder</code> on the panel mesh.</td></tr>
+</table>
+
+<p style="margin-top:44px"><a class="cta" href="./index.html">← Back to the demo</a></p>
+
+</div>
+</body>
+</html>
