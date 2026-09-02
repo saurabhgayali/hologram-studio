@@ -38,7 +38,7 @@ export function createCrystal({ color = '#38e8ff' } = {}) {
   const group = new THREE.Group();
   const geo = new THREE.IcosahedronGeometry(1.1, 0);
   const mat = new THREE.MeshStandardMaterial({
-    color, emissive: new THREE.Color(color), emissiveIntensity: 1.6,
+    color, emissive: new THREE.Color(color), emissiveIntensity: 0.9,
     roughness: 0.15, metalness: 0.4, flatShading: true,
   });
   const core = new THREE.Mesh(geo, mat);
