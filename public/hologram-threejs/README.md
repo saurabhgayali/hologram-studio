@@ -1,4 +1,6 @@
-# Hologram Three.js — Holo-Deck
+# Hologram Studio — Holo-Deck
+
+**[Live demo](https://hologram-studio.vercel.app/)** · **[Documentation](https://hologram-studio.vercel.app/doc.html)** · **[GitHub](https://github.com/saurabhgayali/hologram-studio)**
 
 A **render-target volumetric hologram** for three.js. Ships as a zero-build, single-page demo
 (`index.html`) plus a **reusable, framework-free module** (`holo-projector.js`) you can drop into
